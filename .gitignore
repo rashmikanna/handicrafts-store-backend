@@ -1,0 +1,33 @@
+#gitignore
+
+#ignore virtualenv
+venv1/
+
+#ignore local environment file
+.env
+
+#ignore local SQLite DB
+db.sqlite3
+
+#python cache
+__pycache__/
+*.pyc
+
+#django migrations
+**/migrations/*.py
+**/migrations/*.pyc
+
+#node (frontend)
+node_modules/
+build/
+
+#media/uploads
+media/
+
+#static files (collected)
+staticfiles/
+
+#IDE & OS cruft
+.vscode/
+.DS_Store
+Thumbs.db

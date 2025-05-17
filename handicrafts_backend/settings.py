@@ -34,7 +34,7 @@ SECRET_KEY = 'django-insecure-2^d1qla9$*5v+jf7rjc_2+a+u3b^%j6)_rv0rk4+a5$v^2l@ci
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-
+print("DEBUG:", DEBUG)
 ALLOWED_HOSTS = []
 
 
@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'nosql_users',
     'nosql_notifications',
     'rest_framework',
+    'rest_framework_simplejwt',
     'corsheaders',
     'django_extensions',
 ]
@@ -66,9 +67,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-]
+CORS_ALLOW_ALL_ORIGINS = True
 
 
 ROOT_URLCONF = 'handicrafts_backend.urls'
@@ -170,3 +169,9 @@ cloudinary.config(
     api_key='468745917586793',
     api_secret='tgYurWsEfDdYVzeQ3MCjlYhi7so'
 )
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}

@@ -10,7 +10,11 @@ from django.http import JsonResponse
 from cloudinary.uploader import upload
 from django.views.decorators.csrf import csrf_exempt
 import cloudinary
+from rest_framework import permissions
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.exceptions import PermissionDenied, ValidationError
+
 
 
 # Category viewset
@@ -139,3 +143,46 @@ class ProductListView(APIView):
         products = Product.objects.all()
         serializer = ProductSerializer(products, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+class IsOwnerOrReadOnly(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        # SAFE_METHODS (GET, HEAD, OPTIONS) allowed for any user
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        # Write/Delete only by owner
+        return obj.owner == str(request.user.id)
+
+
+
+
+class TempSellerProductViewSet(viewsets.ModelViewSet):
+    serializer_class = ProductSerializer
+    permission_classes = [AllowAny]  # swap to IsAuthenticated when on real auth
+
+    def get_queryset(self):
+        # only products with owner="temp_seller"
+        return Product.objects(owner="temp_seller")
+
+    def perform_create(self, serializer):
+        # stamp new products as temp_seller
+        serializer.save(owner="temp_seller")
+
+    def retrieve(self, request, pk=None):
+        # Validate that pk is a proper ObjectId
+        if not ObjectId.is_valid(pk):
+            return Response(
+                {"detail": "Invalid ID format."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Manually fetch or return 404
+        try:
+            product = Product.objects.get(id=ObjectId(pk))
+        except Product.DoesNotExist:
+            return Response(
+                {"detail": "Not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = self.get_serializer(product)
+        return Response(serializer.data)

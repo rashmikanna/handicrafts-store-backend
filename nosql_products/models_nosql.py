@@ -2,7 +2,7 @@
 
 from mongoengine import Document, StringField, FloatField, IntField, ReferenceField, ListField, BooleanField, DictField, DateTimeField
 from datetime import datetime, timezone
-
+from django.conf import settings
 
 class Category(Document):
     name = StringField(required=True, unique=True)
@@ -12,6 +12,7 @@ class Category(Document):
 
 class Product(Document):
     name = StringField(required=True)
+    owner = StringField(required=True, default="")
     description = StringField()
     price = FloatField(required=True)
     stock = IntField(default=0)

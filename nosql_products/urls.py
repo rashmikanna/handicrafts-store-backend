@@ -3,12 +3,14 @@
 from django.urls import path, include
 from .views import ProductListView
 from rest_framework.routers import DefaultRouter
-from .views import CategoryViewSet, ProductViewSet, upload_image
+from .views import CategoryViewSet, ProductViewSet, upload_image, TempSellerProductViewSet
 
 #router and register viewsets
 router = DefaultRouter()
 router.register(r'categories', CategoryViewSet, basename='category')
 router.register(r'products', ProductViewSet, basename='product')
+router.register(r'seller/products', TempSellerProductViewSet, basename='temp-seller-products')
+
 
 urlpatterns = [
     path('', include(router.urls)), 

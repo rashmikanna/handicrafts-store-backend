@@ -2,6 +2,8 @@
 
 #ignore virtualenv
 venv1/
+venv3_11/
+
 
 #ignore local environment file
 .env

@@ -1,188 +1,185 @@
-from rest_framework import viewsets, status
-from rest_framework.response import Response
+# nosql_products/views.py
+
+from bson import ObjectId
+from cloudinary.uploader import upload
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
-from rest_framework import permissions
+from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from .models_nosql import Category, Product
 from .serializers import CategorySerializer, ProductSerializer
-from rest_framework.exceptions import ValidationError
-from bson import ObjectId
-from django.http import JsonResponse
-from cloudinary.uploader import upload
-from django.views.decorators.csrf import csrf_exempt
-import cloudinary
-from rest_framework import permissions
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.exceptions import PermissionDenied, ValidationError
 
 
-
-# Category viewset
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    permission_classes = [permissions.AllowAny] 
+    permission_classes = [permissions.AllowAny]
 
     @action(detail=False, methods=['get'])
     def filter_by_name(self, request):
         name = request.query_params.get('name')
-        if name:
-            categories = Category.objects(name__icontains=name)
-            serializer = self.get_serializer(categories, many=True)
-            return Response(serializer.data)
-        return Response({"message": "Please provide a category name to filter."}, status=status.HTTP_400_BAD_REQUEST)
+        if not name:
+            return Response(
+                {"message": "Please provide a category name to filter."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        cats = Category.objects(name__icontains=name)
+        serializer = self.get_serializer(cats, many=True)
+        return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
         if not ObjectId.is_valid(pk):
-            return Response({"error": "Invalid category ID format"}, status=status.HTTP_400_BAD_REQUEST)
-    
+            return Response({"error": "Invalid category ID format"},
+                            status=status.HTTP_400_BAD_REQUEST)
         try:
-            category = Category.objects.get(id=ObjectId(pk))
-            serializer = self.get_serializer(category)
-            return Response(serializer.data)
+            cat = Category.objects.get(id=ObjectId(pk))
         except Category.DoesNotExist:
-            return Response({"error": "Category not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Category not found"},
+                            status=status.HTTP_404_NOT_FOUND)
+        serializer = self.get_serializer(cat)
+        return Response(serializer.data)
 
 
-# Product viewset
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-    permission_classes = [permissions.AllowAny] 
+    permission_classes = [permissions.AllowAny]
 
-    def perform_create(self, serializer):
-        category_id = self.request.data.get('category')
-        category = Category.objects.filter(id=category_id).first()
-        if not category:
-            raise ValidationError({"message": "Invalid category reference."})
-        serializer.save(category=category)
+    def list(self, request, *args, **kwargs):
+        qs = Product.objects.all()
+        filters = {}
 
-    @action(detail=False, methods=['get'])
-    def search(self, request):
-        query = request.query_params.get('q')
-        if query:
-            products = Product.objects(name__icontains=query)
-            serializer = self.get_serializer(products, many=True)
-            return Response(serializer.data)
-        return Response({"message": "Please provide a search query."}, status=status.HTTP_400_BAD_REQUEST)
+        # category filter
+        cat = request.query_params.get('category')
+        if cat:
+            if ObjectId.is_valid(cat):
+                try:
+                    cat_obj = Category.objects.get(id=ObjectId(cat))
+                except Category.DoesNotExist:
+                    return Response({"detail": "Category not found."},
+                                    status=status.HTTP_404_NOT_FOUND)
+            else:
+                cat_obj = Category.objects(name__icontains=cat).first()
+                if not cat_obj:
+                    return Response({"detail": "Category not found."},
+                                    status=status.HTTP_404_NOT_FOUND)
+            filters['category'] = cat_obj
 
-    @action(detail=False, methods=['get'])
-    def filter_by_category(self, request):
-        category_name = request.query_params.get('category')
-        if category_name:
-            category = Category.objects(name__icontains=category_name).first()
-            if category:
-                products = Product.objects(category=category)
-                serializer = self.get_serializer(products, many=True)
-                return Response(serializer.data)
-            return Response({"message": "Category not found."}, status=status.HTTP_404_NOT_FOUND)
-        return Response({"message": "Please provide a category name."}, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(detail=False, methods=['get'])
-    def filter_by_price(self, request):
-        min_price = request.query_params.get('min_price')
-        max_price = request.query_params.get('max_price')
+        # price range
         try:
-            min_price = float(min_price) if min_price else 0
-            max_price = float(max_price) if max_price else float('inf')
+            min_p = request.query_params.get('min_price')
+            max_p = request.query_params.get('max_price')
+            if min_p:
+                filters['price__gte'] = float(min_p)
+            if max_p:
+                filters['price__lte'] = float(max_p)
         except ValueError:
-            return Response({"message": "Invalid price range."}, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError({"detail": "min_price and max_price must be numbers."})
 
-        products = Product.objects(price__gte=min_price, price__lte=max_price)
-        serializer = self.get_serializer(products, many=True)
+        # availability only when true
+        if request.query_params.get('available') == 'true':
+            filters['available'] = True
+
+        qs = qs.filter(**filters)
+
+        # Full-text search using regex
+        q = request.query_params.get('q')
+        if q:
+            qs = qs.filter(__raw__={
+                "$or": [
+                    {"name": {"$regex": q, "$options": "i"}},
+                    {"description": {"$regex": q, "$options": "i"}},
+                    {"tags": {"$regex": q, "$options": "i"}}
+                ]
+            })
+
+        # sorting
+        sort = request.query_params.get('sort')
+        if sort == 'price_asc':
+            qs = qs.order_by('price')
+        elif sort == 'price_desc':
+            qs = qs.order_by('-price')
+        elif sort == 'newest':
+            qs = qs.order_by('-created_at')
+        else:
+            qs = qs.order_by('-created_at')
+
+        serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
 
-    @action(detail=False, methods=['get'])
-    def filter_by_availability(self, request):
-        available = request.query_params.get('available')
-        if available is not None:
-            available_bool = available.lower() == 'true'
-            products = Product.objects(available=available_bool)
-            serializer = self.get_serializer(products, many=True)
-            return Response(serializer.data)
-        return Response({"message": "Provide 'available' as true or false."}, status=status.HTTP_400_BAD_REQUEST)
+    def perform_create(self, serializer):
+        cat_id = self.request.data.get('category')
+        cat = Category.objects.filter(id=cat_id).first()
+        if not cat:
+            raise ValidationError({"message": "Invalid category reference."})
+        serializer.save(category=cat)
 
     def retrieve(self, request, pk=None):
-        # Validate ObjectId
         if not ObjectId.is_valid(pk):
-            return Response({"error": "Invalid product ID format"}, status=status.HTTP_400_BAD_REQUEST)
-    
+            return Response({"error": "Invalid product ID format"},
+                            status=status.HTTP_400_BAD_REQUEST)
         try:
-            product = Product.objects.get(id=ObjectId(pk))
-            serializer = self.get_serializer(product)
-            return Response(serializer.data)
+            prod = Product.objects.get(id=ObjectId(pk))
         except Product.DoesNotExist:
-            return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Product not found"},
+                            status=status.HTTP_404_NOT_FOUND)
+        serializer = self.get_serializer(prod)
+        return Response(serializer.data)
 
 
-# Image upload view
 @csrf_exempt
 def upload_image(request):
-    if request.method == 'POST':
-        # Get the uploaded image from the request
-        image = request.FILES.get('image')
+    if request.method != 'POST':
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+    image = request.FILES.get('image')
+    if not image:
+        return JsonResponse({"error": "No image provided"}, status=400)
+    try:
+        resp = upload(image)
+        return JsonResponse({"image_url": resp.get('secure_url')}, status=200)
+    except Exception as e:
+        return JsonResponse({"error": f"Cloudinary upload failed: {e}"}, status=500)
 
-        if image:
-            try:
-                # Upload the image to Cloudinary
-                response = upload(image)
-
-                # Get the URL of the uploaded image
-                image_url = response.get('secure_url')  # Cloudinary URL
-
-                return JsonResponse({"image_url": image_url}, status=200)
-            except Exception as e:
-                return JsonResponse({"error": f"Cloudinary upload failed: {str(e)}"}, status=500)
-        else:
-            return JsonResponse({"error": "No image provided"}, status=400)
-
-    return JsonResponse({"error": "Invalid request method"}, status=405)
 
 class ProductListView(APIView):
+    """Legacy list-all view if you still need it."""
+    permission_classes = [permissions.AllowAny]
+
     def get(self, request):
-        products = Product.objects.all()
-        serializer = ProductSerializer(products, many=True)
+        prods = Product.objects.all()
+        serializer = ProductSerializer(prods, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-class IsOwnerOrReadOnly(permissions.BasePermission):
-    def has_object_permission(self, request, view, obj):
-        # SAFE_METHODS (GET, HEAD, OPTIONS) allowed for any user
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        # Write/Delete only by owner
-        return obj.owner == str(request.user.id)
-
-
 
 
 class TempSellerProductViewSet(viewsets.ModelViewSet):
     serializer_class = ProductSerializer
-    permission_classes = [AllowAny]  # swap to IsAuthenticated when on real auth
+    permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
-        # only products with owner="temp_seller"
         return Product.objects(owner="temp_seller")
 
     def perform_create(self, serializer):
-        # stamp new products as temp_seller
         serializer.save(owner="temp_seller")
 
     def retrieve(self, request, pk=None):
-        # Validate that pk is a proper ObjectId
         if not ObjectId.is_valid(pk):
-            return Response(
-                {"detail": "Invalid ID format."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Manually fetch or return 404
+            return Response({"detail": "Invalid ID format."},
+                            status=status.HTTP_400_BAD_REQUEST)
         try:
-            product = Product.objects.get(id=ObjectId(pk))
+            ps = Product.objects.get(id=ObjectId(pk))
         except Product.DoesNotExist:
-            return Response(
-                {"detail": "Not found."},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        serializer = self.get_serializer(product)
+            return Response({"detail": "Not found."},
+                            status=status.HTTP_404_NOT_FOUND)
+        serializer = self.get_serializer(ps)
         return Response(serializer.data)
+
+
+class IsOwnerOrReadOnly(permissions.BasePermission):
+    """Allow reads for anyone; writes only for owners."""
+    def has_object_permission(self, request, view, obj):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return obj.owner == str(request.user.id)

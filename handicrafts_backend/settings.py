@@ -37,9 +37,9 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'django_extensions',
-    'rest_framework_simplejwt',
-    'accounts.apps.AccountsConfig',
+    'accounts',
     'producer',
+    'orders',
 ]
 
 MIDDLEWARE = [

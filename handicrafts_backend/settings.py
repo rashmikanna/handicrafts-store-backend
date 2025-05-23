@@ -1,3 +1,5 @@
+# project settings.py
+
 from pathlib import Path
 import os
 from mongoengine import connect
@@ -28,17 +30,15 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
     'nosql_products',
-    'nosql_users',
+    'nosql_usersdata',
     'nosql_notifications',
-
+    'seller_panel',
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
     'django_extensions',
-    'rest_framework_simplejwt',
-    'accounts.apps.AccountsConfig',
+    'accounts',
     'producer',
 ]
 
@@ -101,6 +101,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',},
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',},
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',},
+    {'NAME': 'accounts.validators.ComplexPasswordValidator'},
 ]
 
 # Internationalization
@@ -114,7 +115,7 @@ STATIC_URL = 'static/'
 
 # Customize this path for your machine/project
 STATICFILES_DIRS = [
-    r'C:\Users\Arya\OneDrive\Desktop\Project 1\eshop-frontend\build\static',
+    r'R:\Projects\handicrafts\handicraft-store-frontend\build\static',
     # Change this to your actual frontend build static folder path
 ]
 
@@ -144,5 +145,8 @@ cloudinary.config(
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
     ),
 }

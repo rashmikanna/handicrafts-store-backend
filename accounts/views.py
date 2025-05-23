@@ -3,8 +3,12 @@ from rest_framework.decorators import api_view
 from django.contrib.auth.models import User
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.decorators import permission_classes
+from rest_framework.permissions import AllowAny
+
 
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def signup(request):
     username = request.data.get('username')
     password = request.data.get('password')
@@ -18,7 +22,7 @@ def signup(request):
 
     user = User.objects.create_user(username=username, password=password, email=email)
 
-    # 🔐 Create JWT tokens
+    #Create JWT tokens
     refresh = RefreshToken.for_user(user)
 
     return Response({

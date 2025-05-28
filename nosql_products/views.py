@@ -1,14 +1,17 @@
 # nosql_products/views.py
 
 from bson import ObjectId
-from cloudinary.uploader import upload
-from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+from cloudinary.uploader import upload
+
 from rest_framework import permissions, status, viewsets
-from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
+from rest_framework.decorators import action, api_view, authentication_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
 from .models_nosql import Category, Product
 from .serializers import CategorySerializer, ProductSerializer
 
@@ -46,76 +49,77 @@ class CategoryViewSet(viewsets.ModelViewSet):
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
     def list(self, request, *args, **kwargs):
         qs = Product.objects.all()
-        filters = {}
+        p = request.query_params
 
-        # category filter
-        cat = request.query_params.get('category')
+        cat = p.get('category')
         if cat:
             if ObjectId.is_valid(cat):
-                try:
-                    cat_obj = Category.objects.get(id=ObjectId(cat))
-                except Category.DoesNotExist:
-                    return Response({"detail": "Category not found."},
-                                    status=status.HTTP_404_NOT_FOUND)
+                qs = qs.filter(category=ObjectId(cat))
             else:
-                cat_obj = Category.objects(name__icontains=cat).first()
-                if not cat_obj:
-                    return Response({"detail": "Category not found."},
-                                    status=status.HTTP_404_NOT_FOUND)
-            filters['category'] = cat_obj
+                qs = qs.filter(category__icontains=cat)
 
-        # price range
-        try:
-            min_p = request.query_params.get('min_price')
-            max_p = request.query_params.get('max_price')
-            if min_p:
-                filters['price__gte'] = float(min_p)
-            if max_p:
-                filters['price__lte'] = float(max_p)
-        except ValueError:
-            raise ValidationError({"detail": "min_price and max_price must be numbers."})
+        avail = p.get('available')
+        if avail is not None:
+            qs = qs.filter(available=(avail.lower() == 'true'))
 
-        # availability only when true
-        if request.query_params.get('available') == 'true':
-            filters['available'] = True
+        min_p = p.get('min_price')
+        max_p = p.get('max_price')
+        if min_p:
+            try:
+                qs = qs.filter(price__gte=float(min_p))
+            except ValueError:
+                pass
+        if max_p:
+            try:
+                qs = qs.filter(price__lte=float(max_p))
+            except ValueError:
+                pass
 
-        qs = qs.filter(**filters)
+        tags_param = p.get('tags')
+        if tags_param:
+            wanted = [t.strip() for t in tags_param.split(',') if t.strip()]
+            if wanted:
+                qs = qs.filter(tags__all=wanted)
 
-        # Full-text search using regex
-        q = request.query_params.get('q')
+        q = p.get('q')
         if q:
             qs = qs.filter(__raw__={
                 "$or": [
                     {"name": {"$regex": q, "$options": "i"}},
                     {"description": {"$regex": q, "$options": "i"}},
-                    {"tags": {"$regex": q, "$options": "i"}}
+                    {"tags": {"$regex": q, "$options": "i"}},
                 ]
             })
 
-        # sorting
-        sort = request.query_params.get('sort')
+        sort = p.get('sort')
         if sort == 'price_asc':
             qs = qs.order_by('price')
         elif sort == 'price_desc':
             qs = qs.order_by('-price')
         elif sort == 'newest':
             qs = qs.order_by('-created_at')
-        else:
-            qs = qs.order_by('-created_at')
 
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
 
-    def perform_create(self, serializer):
-        cat_id = self.request.data.get('category')
-        cat = Category.objects.filter(id=cat_id).first()
-        if not cat:
-            raise ValidationError({"message": "Invalid category reference."})
-        serializer.save(category=cat)
+    def create(self, request, *args, **kwargs):
+        # Pass request into serializer via context so .create() handles owner/category
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        if not serializer.is_valid():
+            print("Validation errors:", serializer.errors)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        product = serializer.save()
+        return Response(self.get_serializer(product).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['get'], url_path='tags', permission_classes=[permissions.AllowAny])
+    def list_tags(self, request):
+        all_tags = Product.objects.distinct('tags')
+        return Response(all_tags)
 
     def retrieve(self, request, pk=None):
         if not ObjectId.is_valid(pk):
@@ -145,7 +149,6 @@ def upload_image(request):
 
 
 class ProductListView(APIView):
-    """Legacy list-all view if you still need it."""
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
@@ -154,32 +157,11 @@ class ProductListView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class TempSellerProductViewSet(viewsets.ModelViewSet):
-    serializer_class = ProductSerializer
-    permission_classes = [permissions.AllowAny]
-
-    def get_queryset(self):
-        return Product.objects(owner="temp_seller")
-
-    def perform_create(self, serializer):
-        serializer.save(owner="temp_seller")
-
-    def retrieve(self, request, pk=None):
-        if not ObjectId.is_valid(pk):
-            return Response({"detail": "Invalid ID format."},
-                            status=status.HTTP_400_BAD_REQUEST)
-        try:
-            ps = Product.objects.get(id=ObjectId(pk))
-        except Product.DoesNotExist:
-            return Response({"detail": "Not found."},
-                            status=status.HTTP_404_NOT_FOUND)
-        serializer = self.get_serializer(ps)
-        return Response(serializer.data)
-
-
-class IsOwnerOrReadOnly(permissions.BasePermission):
-    """Allow reads for anyone; writes only for owners."""
-    def has_object_permission(self, request, view, obj):
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        return obj.owner == str(request.user.id)
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def my_seller_products(request):
+    user_id = str(request.user.id)
+    qs = Product.objects.filter(owner=user_id)
+    data = ProductSerializer(qs, many=True).data
+    return Response(data)

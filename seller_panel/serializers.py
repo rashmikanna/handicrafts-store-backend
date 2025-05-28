@@ -1,17 +1,27 @@
-#serializers for seller panel
-
 from rest_framework import serializers
 from .models import SellerProfile
 
 class SellerProfileSerializer(serializers.ModelSerializer):
+   
     class Meta:
-        model   = SellerProfile
-        exclude = ['id', 'user', 'approved', 'applied_at']
+        model = SellerProfile
+        fields = [
+            'shop_name',
+            'craft_category',
+            'district',
+            'village',
+            'govt_id_type',
+            'govt_id_number',
+            'id_document',
+            'bank_account_no',
+            'bank_ifsc',
+        ]
 
-class SellerStatusSerializer(serializers.Serializer):
-    status = serializers.SerializerMethodField()
 
-    def get_status(self, obj):
-        if obj is None:
-            return 'none'
-        return 'approved' if obj.approved else 'pending'
+class SellerStatusSerializer(serializers.ModelSerializer):
+    """
+    Used for GET /seller/status/
+    """
+    class Meta:
+        model = SellerProfile
+        fields = ['approved']

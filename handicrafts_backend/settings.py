@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django_extensions',
     'accounts',
     'producer',
+    'captcha'
 ]
 
 MIDDLEWARE = [
@@ -60,7 +61,7 @@ ROOT_URLCONF = 'handicrafts_backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -150,3 +151,14 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ),
 }
+
+# Email settings for development (use real SMTP in production)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", 'srutigoteti@gmail.com')  # Set in .env
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", 'ywfg ojeq jqqn npom')  # Set in .env
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+

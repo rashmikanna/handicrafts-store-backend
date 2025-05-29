@@ -7,6 +7,8 @@ venv3_11/
 
 #ignore local environment file
 .env
+.env.*.local
+
 
 #ignore local SQLite DB
 db.sqlite3
@@ -31,5 +33,10 @@ staticfiles/
 
 #IDE & OS cruft
 .vscode/
+.idea/
 .DS_Store
 Thumbs.db
+
+# Logs
+*.log
+logs/

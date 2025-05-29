@@ -28,6 +28,9 @@ urlpatterns = [
     path('api/products/', include('nosql_products.urls')),  
     path('api/seller/', include('seller_panel.urls', namespace='seller_panel')),
     path('api/', include('accounts.urls')),
+    path('api/orders/', include('orders.urls')),
+    path('api/products/', include('reviews.urls')),
+
 ]
 
 # Serve static and media files in development

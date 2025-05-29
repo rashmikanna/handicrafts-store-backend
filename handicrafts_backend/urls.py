@@ -1,3 +1,5 @@
+# project urls.py
+
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
@@ -5,6 +7,7 @@ from django.conf.urls.static import static
 from .views import home
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from accounts.views import signup
+from seller_panel.views import seller_signup
 
 urlpatterns = [
     path('', home),
@@ -20,9 +23,14 @@ urlpatterns = [
 
     # App APIs
     path('api/', include('producer.urls')),
-    path('api/users/', include('nosql_users.urls')),
+    path('api/usersdata/', include('nosql_usersdata.urls')),
     path('api/notifications/', include('nosql_notifications.urls')),
     path('api/products/', include('nosql_products.urls')),  
+    path('api/seller/', include('seller_panel.urls', namespace='seller_panel')),
+    path('api/', include('accounts.urls')),
+    path('api/orders/', include('orders.urls')),
+    path('api/products/', include('reviews.urls')),
+
 ]
 
 # Serve static and media files in development
@@ -31,3 +39,5 @@ urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+

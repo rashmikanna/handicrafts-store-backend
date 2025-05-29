@@ -43,7 +43,9 @@ INSTALLED_APPS = [
     'seller_panel',
     'accounts',
     'producer',
-    'captcha'
+    'captcha',
+    'orders',
+    'reviews',
 ]
 
 MIDDLEWARE = [

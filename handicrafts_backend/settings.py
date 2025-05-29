@@ -42,10 +42,12 @@ INSTALLED_APPS = [
     'nosql_notifications',
     'seller_panel',
     'accounts',
-    'producer',
     'captcha',
     'orders',
     'reviews',
+    'accounts',
+    'producer',
+    'orders',
 ]
 
 MIDDLEWARE = [

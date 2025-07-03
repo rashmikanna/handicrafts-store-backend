@@ -43,9 +43,7 @@ INSTALLED_APPS = [
     'seller_panel',
     'accounts',
     'captcha',
-    'orders',
     'reviews',
-    'accounts',
     'producer',
     'orders',
 ]

@@ -1,16 +1,17 @@
-#urls for users browser history and wishlist
+# nosql_usersdata/urls.py
 
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import BrowsingHistoryViewSet, WishlistViewSet
+from django.urls import path
+from .views import get_user_wishlist, WishlistViewSet
 
-router = DefaultRouter()
-router.register(r'browsinghistory', BrowsingHistoryViewSet, basename='browsinghistory')
-router.register(r'wishlist', WishlistViewSet, basename='wishlist')
+# Map the two action routes (no user_id in URL; JWT tells us who)
+wishlist_add    = WishlistViewSet.as_view({'post': 'add_product'})
+wishlist_remove = WishlistViewSet.as_view({'post': 'remove_product'})
 
 urlpatterns = [
-    path('api/users/', include(router.urls)),
-    # Explicitly add custom actions for the WishlistViewSet
-    path('api/users/wishlist/<str:pk>/add_product/', WishlistViewSet.as_view({'post': 'add_product'}), name='wishlist-add-product'),
-    path('api/users/wishlist/<str:pk>/remove_product/', WishlistViewSet.as_view({'post': 'remove_product'}), name='wishlist-remove-product'),
+    # GET: full product list for current user
+    path('wishlist/', get_user_wishlist, name='get_user_wishlist'),
+
+    # POST: add/remove
+    path('wishlist/add_product/',    wishlist_add,    name='wishlist_add_product'),
+    path('wishlist/remove_product/', wishlist_remove, name='wishlist_remove_product'),
 ]

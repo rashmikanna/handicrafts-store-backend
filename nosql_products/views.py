@@ -57,10 +57,22 @@ class ProductViewSet(viewsets.ModelViewSet):
 
         cat = p.get('category')
         if cat:
-            if ObjectId.is_valid(cat):
+            cat_lower = cat.lower()
+            if cat_lower == 'handloom':
+                # Match any category whose name contains "loom"
+                matched_cats = Category.objects(name__icontains='loom').only('id')
+                qs = qs.filter(category__in=[c.id for c in matched_cats])
+            elif cat_lower == 'gift':
+                # Match only specific categories
+                matched_cats = Category.objects(name__in=['Silver Crafts', 'Paintings & Art']).only('id')
+                qs = qs.filter(category__in=[c.id for c in matched_cats])
+            elif ObjectId.is_valid(cat):
                 qs = qs.filter(category=ObjectId(cat))
             else:
-                qs = qs.filter(category__icontains=cat)
+                # Match exact category name
+                matched_cats = Category.objects(name__iexact=cat).only('id')
+                qs = qs.filter(category__in=[c.id for c in matched_cats])
+
 
         avail = p.get('available')
         if avail is not None:

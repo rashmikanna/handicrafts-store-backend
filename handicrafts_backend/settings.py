@@ -41,7 +41,6 @@ INSTALLED_APPS = [
     'nosql_usersdata',
     'nosql_notifications',
     'seller_panel',
-    'accounts',
     'captcha',
     'reviews',
     'producer',
@@ -171,7 +170,17 @@ EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", 'srutigoteti@gmail.com')  # Set in .env
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", 'ywfg ojeq jqqn npom')  # Set in .env
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", 'tbxl veal kbcj zagn')  # Set in .env
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+# settings.py
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
+RAZORPAY_KEY_ID = "rzp_test_jkGod2Tcns7jzy"
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+PAYU_MERCHANT_KEY = "caRoBl"
+PAYU_MERCHANT_SALT = os.getenv("PAYU_MERCHANT_SALT")
+
+
+
 
 

@@ -17,6 +17,8 @@ class Product(Document):
     price = FloatField(required=True)
     stock = IntField(default=0)
     category = ReferenceField(Category)
+    craft = ListField(StringField())
+    spin_frames = ListField(StringField())
     images = ListField(StringField())
     tags = ListField(StringField())
     available = BooleanField(default=True)
